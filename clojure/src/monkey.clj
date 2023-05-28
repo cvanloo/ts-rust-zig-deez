@@ -41,21 +41,22 @@
     :ident))
 
 (defn parse
-  ([input] (parse input 0 []))
-  ([[ch & rest :as input] pos tokens]
-   (if (empty? input)
-     (conj tokens [:eof pos])
-     (cond (space? ch) (recur rest (inc pos) tokens)
-           (ch-token? ch) (recur rest (inc pos) (conj tokens [(ch->token ch) pos]))
-           (digit? ch) (parse input pos tokens digit? :int)
-           (letter? ch) (parse input pos tokens letter? nil)
-           :else (recur rest (inc pos) (conj tokens [:illegal pos ch])))))
-  ([input pos tokens pred kind]
+  ([input] (parse input 0))
+  ([[ch & rest :as input] pos]
+   (cond (empty? input) (list [:eof pos])
+         (space? ch) (parse rest (inc pos))
+         (ch-token? ch) (cons [(ch->token ch) pos]
+                              (lazy-seq (parse rest (inc pos))))
+         (digit? ch) (parse input pos digit? :int)
+         (letter? ch) (parse input pos letter? nil)
+         :else (list [:illegal pos ch])))
+  ([input pos pred kind]
    (let [[word rest] (split-with pred input)
          word (apply str word)
          npos (+ pos (count word))
          kind (or kind (ident->kind word))]
-     (parse rest npos (conj tokens (case kind
-                                     :ident [kind pos word]
-                                     :int [kind pos (Integer/parseInt word)]
-                                     [kind pos]))))))
+     (cons (case kind
+             :ident [kind pos word]
+             :int [kind pos (Integer/parseInt word)]
+             [kind pos])
+           (lazy-seq (parse rest npos))))))
